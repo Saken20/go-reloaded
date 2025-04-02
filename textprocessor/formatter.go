@@ -1,18 +1,20 @@
 package textprocessor
 
 import (
+	"regexp"
 	"strconv"
 	"strings"
+	// "unicode"
+
+	"golang.org/x/text/cases"
+	"golang.org/x/text/language"
 )
 
-// Изменение регистра
+// Применяет изменение регистра к заданному количеству слов
 func ApplyCaseChange(words []string, index int, mode string) []string {
-	count := 1
-	if len(words[index]) > 4 {
-		count = extractNumber(words[index])
-	}
-
+	count := extractNumber(words[index])
 	start := max(0, index-count)
+
 	for i := start; i < index; i++ {
 		switch mode {
 		case "upper":
@@ -20,42 +22,35 @@ func ApplyCaseChange(words []string, index int, mode string) []string {
 		case "lower":
 			words[i] = strings.ToLower(words[i])
 		case "capital":
-			words[i] = strings.Title(words[i])
+			words[i] = cases.Title(language.Und).String(words[i])
 		}
 	}
 
 	return append(words[:index], words[index+1:]...)
 }
 
-// Исправление пунктуации
+// Исправляет пунктуацию в тексте
 func FixPunctuation(text string) string {
-	replacements := []struct {
-		old string
-		new string
-	}{
-		{" ,", ","},
-		{" .", "."},
-		{" !", "!"},
-		{" ?", "?"},
-		{" :", ":"},
-		{" ;", ";"},
-		{" ...", "..."},
-		{" !?", "!?"},
-	}
+	lines := strings.Split(text, "\n") // Разбиваем по строкам, чтобы сохранить переносы
+	for i, line := range lines {
+		re := regexp.MustCompile(`\s*([,!.?:;])\s*`)
+		line = re.ReplaceAllString(line, "$1 ")
 
-	for _, r := range replacements {
-		text = strings.ReplaceAll(text, r.old, r.new)
+		reEllipsis := regexp.MustCompile(`\s*\.\.\.\s*`)
+		line = reEllipsis.ReplaceAllString(line, "...")
+
+		lines[i] = strings.TrimSpace(line)
 	}
-	return text
+	return strings.Join(lines, "\n") // Собираем текст обратно с переносами строк
 }
 
-// Исправление "a"/"an"
+// Исправляет использование артиклей "a" и "an"
 func FixArticle(text string) string {
 	words := strings.Fields(text)
 	for i := 0; i < len(words)-1; i++ {
 		if words[i] == "a" {
 			nextWord := words[i+1]
-			if strings.ContainsAny(strings.ToLower(nextWord[:1]), "aeiouh") {
+			if strings.ContainsAny(strings.ToLower(string(nextWord[0])), "aeiouh") {
 				words[i] = "an"
 			}
 		}
@@ -63,22 +58,46 @@ func FixArticle(text string) string {
 	return strings.Join(words, " ")
 }
 
-// Извлечение числа из (up, 3)
+// Применяет Capitalize к X словам перед маркером (cap, X)
+func ApplyCapitalize(words []string) []string {
+	for i := 0; i < len(words); i++ {
+		if strings.Contains(words[i], "(cap") {
+			count := extractNumber(words[i])
+
+			for j := max(0, i-count); j < i; j++ {
+				words[j] = Capitalize(words[j])
+			}
+
+			words = append(words[:i], words[i+1:]...)
+			i--
+		}
+	}
+	return words
+}
+
+// Делает первую букву каждого слова заглавной
+func Capitalize(word string) string {
+	if len(word) == 0 {
+		return word
+	}
+	return strings.ToUpper(string(word[0])) + strings.ToLower(word[1:])
+}
+
+// Извлекает число из строки, например: (cap, 3) → 3
 func extractNumber(word string) int {
-	start := strings.Index(word, ",")
-	end := strings.Index(word, ")")
-	if start == -1 || end == -1 {
+	re := regexp.MustCompile(`\d+`)
+	match := re.FindString(word)
+	if match == "" {
 		return 1
 	}
-
-	num, err := strconv.Atoi(word[start+1 : end])
+	num, err := strconv.Atoi(match)
 	if err != nil {
 		return 1
 	}
 	return num
 }
 
-// Функция max
+// Возвращает максимальное значение из двух чисел
 func max(a, b int) int {
 	if a > b {
 		return a

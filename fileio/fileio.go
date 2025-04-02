@@ -1,12 +1,12 @@
 package fileio
 
 import (
-	"io/ioutil"
+	"os"
 )
 
 // Чтение файла
 func ReadFile(filename string) (string, error) {
-	content, err := ioutil.ReadFile(filename)
+	content, err := os.ReadFile(filename)
 	if err != nil {
 		return "", err
 	}
@@ -15,5 +15,5 @@ func ReadFile(filename string) (string, error) {
 
 // Запись файла
 func WriteFile(filename string, content string) error {
-	return ioutil.WriteFile(filename, []byte(content), 0644)
+	return os.WriteFile(filename, []byte(content), 0644)
 }
